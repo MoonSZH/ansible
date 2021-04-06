@@ -1,0 +1,35 @@
+[Unit]
+Description = payara5 Server 
+After=network-online.target
+Wants=network-online.target
+[Service]
+User={{ username }}
+Group={{ username }}
+#PermissionsStartOnly=true
+InaccessibleDirectories=/sys
+PrivateTmp=true
+PrivateDevices=true
+ExecStartPre=/usr/bin/chown -R {{ username }}:{{ username }} {{ workfolder.app }}payara5
+ExecStart={{ workfolder.java }}{{ java }}/bin/java -jar {{ workfolder.app }}payara5/glassfish/lib/client/appserver-cli.jar start-domain server-domain
+ExecStop ={{ workfolder.java }}{{ java }}/bin/java -jar {{ workfolder.app }}payara5/glassfish/lib/client/appserver-cli.jar stop-domain server-domain
+ExecReload ={{ workfolder.java }}{{ java }}/bin/java -jar {{ workfolder.app }}payara5/glassfish/lib/client/appserver-cli.jar restart-domain server-domain
+Type = forking
+
+[Install]
+WantedBy = multi-user.target
+
+
+
+#[Unit]
+#After=network-online.target
+#Wants=network-online.target
+
+#[Service]
+#User=oracle
+#Group=oracle
+#ExecStart=/u01/app/glassfish5/bin/asadmin start-domain smev-test
+#ExecStop=/u01/app/glassfish5/bin/asadmin stop-domain smev-test
+#ExecReload=/u01/app/glassfish5/bin/asadmin restart-domain smev-test
+
+#[Install]
+#WantedBy=multi-user.target
