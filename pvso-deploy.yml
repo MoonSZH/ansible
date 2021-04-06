@@ -1,0 +1,52 @@
+- name: "Deploy PVSO"
+  hosts: **************
+  gather_facts: no
+  become: yes
+  become_user: oracle
+  vars:
+      wozm_new: ~/new-WOZM/wozm*.ear
+      backup:
+        path: ~/backup_`date +'%d-%m-%Y'`/
+        wozm: ~/backup_`date +'%d-%m-%Y'`/wozm/wozm*.ear
+        fm-editor: ~/backup_`date +'%d-%m-%Y'`/fm-editor/fm-editor*.war
+        fssarm: ~/backup_`date +'%d-%m-%Y'`/fssarm/fssarm.war
+      applications: 
+        wozm: wozm
+        fm-editor: fm-editor
+        fssarm: fssarm
+
+  tasks:
+    - name: "Kill Nodes"
+      shell: "kill -9 $(pgrep -f INSTANCE)"
+      ignore_errors: yes
+
+    - name: "Backup files"
+      when: inventory_hostname == "*************************"
+      shell: "cp -R ~/app/glassfish4/glassfish/domains/wozm/applications/__internal/ '{{ backup.path }}'"
+
+    - name: "Undeploy applications"
+      when: inventory_hostname == "***********************"
+      shell: "{{ item }}"
+      ignore_errors: yes
+      with_items:
+          - "/u01/app/glassfish4/glassfish/bin/asadmin --user admin --passwordfile ~/.pfile-glassfish undeploy --target wozmcluster '{{ applications.wozm }}'"
+          - "/u01/app/glassfish4/glassfish/bin/asadmin --user admin --passwordfile ~/.pfile-glassfish undeploy --target wozmcluster '{{ applications.fm-editor }}'"
+          - "/u01/app/glassfish4/glassfish/bin/asadmin --user admin --passwordfile ~/.pfile-glassfish undeploy --target wozmcluster '{{ applications.fssarm }}'"
+
+    - name: Pause for 15 seconds to undeploy app cache
+      pause:
+        seconds: 15
+
+    # - name: Pause for 15 seconds to undeploy app cache
+    #   shell: "sleep 15"    
+
+    - name: "Start Nodes"
+      shell: "/u01/app/glassfish4/glassfish/bin/asadmin --user admin --passwordfile ~/.pfile-glassfish   start-local-instance --sync=full"
+
+    - name: "Deploy applications"
+      shell: "{{ item }}"
+      ignore_errors: yes
+      with_items:
+          - "/u01/app/glassfish4/glassfish/bin/asadmin --user admin --passwordfile ~/.pfile-glassfish deploy --contextroot fm-editor  --name fm-editor --force=true --target wozmcluster '{{ backup.fm-editor }}'"
+          - "/u01/app/glassfish4/glassfish/bin/asadmin --user admin --passwordfile ~/.pfile-glassfish deploy --contextroot fssarm  --name faasrm --force=true --target wozmcluster '{{ backup.fssarm }}'"
+          - "/u01/app/glassfish4/glassfish/bin/asadmin --user admin --passwordfile ~/.pfile-glassfish deploy --force=true --target wozmcluster --name wozm '{{ wozm_new }}'"
