@@ -22,16 +22,18 @@
 
     - name: "Backup files"
       when: inventory_hostname == "*************************"
-      shell: "cp -R ~/app/glassfish4/glassfish/domains/wozm/applications/__internal/ '{{ backup.path }}'"
+      shell: "cp -R ~/app/glassfish4/glassfish/domains/wozm/applications/__internal/ {{ backup.path }}"
 
     - name: "Undeploy applications"
       when: inventory_hostname == "***********************"
-      shell: "{{ item }}"
+      shell: 
+        chdir: "/u01/app/glassfish4/glassfish/bin"
+        cmd: "{{ item }}"
       ignore_errors: yes
       with_items:
-          - "/u01/app/glassfish4/glassfish/bin/asadmin --user admin --passwordfile ~/.pfile-glassfish undeploy --target wozmcluster '{{ applications.wozm }}'"
-          - "/u01/app/glassfish4/glassfish/bin/asadmin --user admin --passwordfile ~/.pfile-glassfish undeploy --target wozmcluster '{{ applications.fm-editor }}'"
-          - "/u01/app/glassfish4/glassfish/bin/asadmin --user admin --passwordfile ~/.pfile-glassfish undeploy --target wozmcluster '{{ applications.fssarm }}'"
+          - "./asadmin --user admin --passwordfile ~/.pfile-glassfish undeploy --target wozmcluster {{ applications.wozm }}"
+          - "./asadmin --user admin --passwordfile ~/.pfile-glassfish undeploy --target wozmcluster {{ applications.fm-editor }}"
+          - "./asadmin --user admin --passwordfile ~/.pfile-glassfish undeploy --target wozmcluster {{ applications.fssarm }}"
 
     - name: Pause for 15 seconds to undeploy app cache
       pause:
@@ -41,12 +43,16 @@
     #   shell: "sleep 15"    
 
     - name: "Start Nodes"
-      shell: "/u01/app/glassfish4/glassfish/bin/asadmin --user admin --passwordfile ~/.pfile-glassfish   start-local-instance --sync=full"
+      shell:
+        chdir: "/u01/app/glassfish4/glassfish/bin"
+        cmd: "./asadmin --user admin --passwordfile ~/.pfile-glassfish   start-local-instance --sync=full"
 
     - name: "Deploy applications"
-      shell: "{{ item }}"
+      shell:
+        chdir: "/u01/app/glassfish4/glassfish/bin"
+        cmd: "{{ item }}"
       ignore_errors: yes
       with_items:
-          - "/u01/app/glassfish4/glassfish/bin/asadmin --user admin --passwordfile ~/.pfile-glassfish deploy --contextroot fm-editor  --name fm-editor --force=true --target wozmcluster '{{ backup.fm-editor }}'"
-          - "/u01/app/glassfish4/glassfish/bin/asadmin --user admin --passwordfile ~/.pfile-glassfish deploy --contextroot fssarm  --name faasrm --force=true --target wozmcluster '{{ backup.fssarm }}'"
-          - "/u01/app/glassfish4/glassfish/bin/asadmin --user admin --passwordfile ~/.pfile-glassfish deploy --force=true --target wozmcluster --name wozm '{{ wozm_new }}'"
+          - "./asadmin --user admin --passwordfile ~/.pfile-glassfish deploy --contextroot fm-editor  --name fm-editor --force=true --target wozmcluster {{ backup.fm-editor }}"
+          - "./asadmin --user admin --passwordfile ~/.pfile-glassfish deploy --contextroot fssarm  --name faasrm --force=true --target wozmcluster {{ backup.fssarm }}"
+          - "./asadmin --user admin --passwordfile ~/.pfile-glassfish deploy --force=true --target wozmcluster --name wozm {{ wozm_new }}"
