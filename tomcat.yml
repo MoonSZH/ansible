@@ -1,0 +1,105 @@
+---
+  - name: Install Glassfis
+    gather_facts: no
+    become: yes
+    hosts: nodes
+    vars:
+      username: oracle
+      upassword: Manager1
+      workfolder: 
+        app: /u01/app/
+        java: /u01/java/
+      java: jre1.8.0_281
+      jdk: jre1.8.0_281
+      domain: server-domain
+
+    tasks:
+
+      - name: Create work user
+        user: 
+          name: "{{ username }}"
+          password: "{{ upassword | password_hash('sha512') }}"
+          groups: wheel
+          append: yes
+
+      - name: Create workfolder for Tomcat and Java
+        file:
+          path: "{{ item }}"
+          state: directory
+          owner: "{{username}}"
+          group: "{{username}}"
+          mode: 0775
+          recurse: yes
+        with_items:
+          - "{{ workfolder.app }}"
+          - "{{ workfolder.java }}"
+
+      - name: Extract tomcat.zip into /u01/app/tomcat and java into /u01/java
+        unarchive:
+          src: "{{ item.zip }}"
+          dest: '{{ item.path }}'
+          owner: "{{username}}"
+          group: "{{username}}"
+        with_items:
+          - { zip: files/apache-tomcat-9.0.44.tar.gz, path: "{{ workfolder.app }}" }
+          - { zip: files/jre-8u281-linux-x64.tar.gz, path: "{{ workfolder.java }}"}
+
+      - name: Copy jdbc driver for Glassfish
+        copy:
+          owner: "{{username}}"
+          group: "{{username}}"
+          src: files/ojdbc8.jar
+          dest: "{{ workfolder.app }}tomcat9/lib/"
+
+      # - name: Copy service file glassfish.service
+      #   template:
+      #     src: glassfish.service.j2
+      #     dest: /etc/systemd/system/glassfish.service
+      #     mode: a+x
+
+      # - name: Service daemon reload
+      #   systemd:
+      #     daemon_reload: yes
+
+
+
+      - name: Copy passfile
+        template: 
+          src: password.txt.j2
+          dest: "{{ workfolder.app }}payara5/glassfish/bin/.password.txt"
+          owner: "{{ username }}"
+          group: "{{ username }}"
+          mode: 0600     
+          
+      - name: Create new domain Glassfish
+        become_user: "{{ username }}" 
+        shell:
+          chdir: "{{ workfolder.app }}payara5/glassfish/bin"
+          cmd: "{{ workfolder.java }}{{ java }}/bin/java -jar {{ workfolder.app }}payara5/glassfish/lib/client/appserver-cli.jar  --interactive=false --user admin --passwordfile {{ workfolder.app }}payara5/glassfish/bin/.password.txt  create-domain {{ domain }}"
+
+      - name: Start domain glassfisр
+        systemd:
+          name : glassfish.service
+          enabled: yes
+          state: started
+
+      - name: Enable secure admin domain
+        become_user: "{{ username }}"
+        shell:
+          chdir: "{{ workfolder.app }}payara5/glassfish/bin"
+          cmd: "{{ workfolder.java }}{{ java }}/bin/java -jar {{ workfolder.app }}payara5/glassfish/lib/client/appserver-cli.jar  --interactive=false --user admin --passwordfile {{ workfolder.app }}payara5/glassfish/bin/.password.txt  enable-secure-admin"
+
+      - name: Copy jdbc driver for Glassfish
+        copy:
+          src: files/ojdbc8.jar
+          dest: "{{ workfolder.app }}payara5/glassfish/domains/{{ domain }}/lib/"
+
+      - name: Restart-domain Glassfish
+        systemd:
+          name: glassfish.service
+          state: restarted
+
+      - name: Delete passfile
+        file:
+          path: "{{ workfolder.app }}payara5/glassfish/bin/.password.txt"
+          state: absent
